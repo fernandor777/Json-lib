@@ -17,6 +17,8 @@ package net.sf.json.util;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import net.sf.json.JSONException;
 
@@ -58,7 +60,7 @@ import net.sf.json.JSONException;
  * @version 1
  */
 public class JSONBuilder {
-   private static final int MAXDEPTH = 20;
+   private static final int MAXDEPTH_DEFAULT = 100;
 
    /**
     * The comma flag determines if a comma should be output before the next
@@ -86,14 +88,17 @@ public class JSONBuilder {
     * The writer that will receive the output.
     */
    protected Writer writer;
+   
+   private final int maxDepth;
 
    /**
     * Make a fresh JSONBuilder. It can be used to build one JSON text.
     */
    public JSONBuilder( Writer w ) {
+      this.maxDepth = getMaxDepth();
       this.comma = false;
       this.mode = 'i';
-      this.stack = new char[MAXDEPTH];
+      this.stack = new char[maxDepth];
       this.top = 0;
       this.writer = w;
    }
@@ -266,7 +271,7 @@ public class JSONBuilder {
     * @throws JSONException If nesting is too deep.
     */
    private void push( char c ) {
-      if( this.top >= MAXDEPTH ){
+      if( this.top >= maxDepth ){
          throw new JSONException( "Nesting too deep." );
       }
       this.stack[this.top] = c;
@@ -319,5 +324,31 @@ public class JSONBuilder {
     */
    public JSONBuilder value( Object o ) {
       return this.append( JSONUtils.valueToString( o ) );
+   }
+   
+   /**
+    * The max depth allowed for this builder.
+    */
+   static int getMaxDepth() {
+       final String maxDepthProperty = System.getProperty("json.maxDepth");
+       if (maxDepthProperty == null) return MAXDEPTH_DEFAULT;
+       try {
+           final int max = Integer.parseInt(maxDepthProperty.trim());
+           if (max <= 0) {
+               final Logger logger = Logger.getLogger(JSONBuilder.class.getName());
+               if (logger.isLoggable(Level.WARNING))
+                   logger
+                       .warning("Bad value for 'json.maxDepth' system property, it must be greater than zero."
+                               + " Current value: " + max);
+               return MAXDEPTH_DEFAULT;
+           }
+           return max;
+       } catch (NumberFormatException e) {
+           final Logger logger = Logger.getLogger(JSONBuilder.class.getName());
+           if (logger.isLoggable(Level.WARNING))
+               logger
+                   .warning("Bad number format for 'json.maxDepth' system property: " + maxDepthProperty);
+           return MAXDEPTH_DEFAULT;
+       }
    }
 }
